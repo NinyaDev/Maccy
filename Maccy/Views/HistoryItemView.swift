@@ -59,6 +59,7 @@ struct HistoryItemView: View {
     }
     .accessibilityIdentifier("copy-history-item")
     .buttonAction(performSelect)
+    .modifier(ImageDragModifier(item: item))
     .onAppear {
       item.ensureThumbnailImage()
     }
