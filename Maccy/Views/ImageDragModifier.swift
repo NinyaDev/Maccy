@@ -3,12 +3,13 @@ import SwiftUI
 struct ImageDragModifier: ViewModifier {
   let item: HistoryItemDecorator
   var onClick: (() -> Void)?
+  var onHover: ((_ mouseMoved: Bool) -> Void)?
 
   @ViewBuilder
   func body(content: Content) -> some View {
     if item.hasImage {
       content.overlay {
-        ImageDragSource(item: item, onClick: onClick)
+        ImageDragSource(item: item, onClick: onClick, onHover: onHover)
           .accessibilityHidden(true)
       }
     } else {
@@ -20,6 +21,7 @@ struct ImageDragModifier: ViewModifier {
 private struct ImageDragSource: NSViewRepresentable {
   let item: HistoryItemDecorator
   var onClick: (() -> Void)?
+  var onHover: ((_ mouseMoved: Bool) -> Void)?
 
   func makeNSView(context: Context) -> ImageDragView {
     let view = ImageDragView()
@@ -29,6 +31,7 @@ private struct ImageDragSource: NSViewRepresentable {
 
   func updateNSView(_ view: ImageDragView, context: Context) {
     view.onClick = onClick
+    view.onHover = onHover
     view.makeDrag = {
       let originalPNG = item.item.contents.first { $0.type == NSPasteboard.PasteboardType.png.rawValue }?.value
       guard let data = originalPNG ?? item.item.imageData,
@@ -41,11 +44,35 @@ private struct ImageDragSource: NSViewRepresentable {
 /// Own the native drag session so its image contains only the picture, never the popup's hosting view.
 private final class ImageDragView: NSView, NSDraggingSource {
   var onClick: (() -> Void)?
+  var onHover: ((_ mouseMoved: Bool) -> Void)?
   var makeDrag: (() -> (ImageDragPayload, NSImage)?)?
+  private var hoverTrackingArea: NSTrackingArea?
 
   override var mouseDownCanMoveWindow: Bool { false }
 
   override func acceptsFirstMouse(for event: NSEvent?) -> Bool { true }
+
+  override func updateTrackingAreas() {
+    super.updateTrackingAreas()
+    if let hoverTrackingArea {
+      removeTrackingArea(hoverTrackingArea)
+    }
+    let area = NSTrackingArea(
+      rect: .zero,
+      options: [.activeInKeyWindow, .inVisibleRect, .mouseEnteredAndExited, .mouseMoved],
+      owner: self, userInfo: nil
+    )
+    addTrackingArea(area)
+    hoverTrackingArea = area
+  }
+
+  override func mouseEntered(with event: NSEvent) {
+    onHover?(false)
+  }
+
+  override func mouseMoved(with event: NSEvent) {
+    onHover?(true)
+  }
 
   override func mouseDown(with event: NSEvent) {
     guard let window else { return }
