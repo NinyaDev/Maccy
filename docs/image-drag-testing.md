@@ -4,8 +4,8 @@ Image rows and the loaded image in the preview pane export the original image as
 Existing PNG bytes are preserved; other image formats are normalized at full resolution,
 including photo orientation. Text and copied file entries are outside this feature's scope.
 
-The provider owns image bytes independently of the UI and history. It supplies PNG data,
-a PNG file representation, and a file URL for destinations that expect existing files.
+The drag payload owns image bytes independently of the UI and history. The native drag
+pasteboard supplies PNG data and a file URL for destinations that expect existing files.
 Exports use `Image-<SHA256 of original bytes>.png` names, never OCR text. Separate drags
 of identical image bytes reuse the same cached PNG without re-encoding or rewriting it.
 Different source bytes have separate entries; visually identical images with different
@@ -55,3 +55,30 @@ For both a history row and the loaded image in its preview:
 9. Repeat with a large screenshot, a transparent PNG, and a rotated JPEG or HEIC photo.
 
 Provider unit tests alone cannot establish cross-application gesture compatibility.
+
+## Inspecting cache reuse
+
+For the sandboxed development app, use Finder's Go to Folder with:
+
+```text
+~/Library/Containers/org.p0deje.Maccy/Data/tmp/MaccyImageDrags
+```
+
+To compare the cache before and after dragging the same history image again:
+
+```sh
+ls -liT "$HOME/Library/Containers/org.p0deje.Maccy/Data/tmp/MaccyImageDrags"
+```
+
+The content-hash filename, inode (first column), and size should remain unchanged.
+The modification time is intentionally refreshed for expiry. Finder can create another
+destination copy on every drop; those copies are outside Maccy's cache. Temporary files may also be purged by macOS; missing cache entries are recreated on demand.
+
+## Native drag behavior
+
+An AppKit drag source explicitly supplies the floating image and closes the popup after
+successful drops. Cancelled/rejected drops keep it open. Normal clicks invoke the existing
+copy/paste action; keyboard and VoiceOver activation remain available on the history row.
+The floating preview fits within 240 × 160 points without changing the exported resolution.
+The native pasteboard representation is covered by programmatic tests. Gesture behavior
+and destination compatibility require the live checks above.

@@ -1,3 +1,4 @@
+import AppKit
 import CryptoKit
 import Foundation
 import ImageIO
@@ -53,7 +54,14 @@ final class ImageDragPayload: @unchecked Sendable {
     return provider
   }
 
-  private func fileURL() throws -> URL {
+  func pasteboardItem() -> NSPasteboardItem {
+    let item = NSPasteboardItem()
+    // The pasteboard item retains its provider independently of the source view.
+    item.setDataProvider(ImageDragDataProvider(payload: self), forTypes: [.fileURL, .png])
+    return item
+  }
+
+  fileprivate func fileURL() throws -> URL {
     Self.cacheLock.lock()
     defer { Self.cacheLock.unlock() }
     let url = directory.appendingPathComponent(filename)
@@ -124,6 +132,28 @@ final class ImageDragPayload: @unchecked Sendable {
             let modified = values.contentModificationDate,
             now.timeIntervalSince(modified) > retentionInterval else { continue }
       try? manager.removeItem(at: file)
+    }
+  }
+}
+
+private final class ImageDragDataProvider: NSObject, NSPasteboardItemDataProvider {
+  let payload: ImageDragPayload
+
+  init(payload: ImageDragPayload) {
+    self.payload = payload
+  }
+
+  func pasteboard(_ pasteboard: NSPasteboard?, item: NSPasteboardItem,
+                  provideDataForType type: NSPasteboard.PasteboardType) {
+    do {
+      let url = try payload.fileURL()
+      if type == .fileURL {
+        item.setString(url.absoluteString, forType: type)
+      } else if type == .png {
+        item.setData(try Data(contentsOf: url), forType: type)
+      }
+    } catch {
+      NSLog("Cannot export dragged image: %@", error.localizedDescription)
     }
   }
 }

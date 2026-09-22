@@ -192,6 +192,34 @@ final class ImageDragPayloadTests: XCTestCase {
     XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: directory.path).count, 1)
   }
 
+  func testNativePasteboardExportsImageAndFileWithoutTheSourceView() throws {
+    let data = try imageData(.png)
+    let pasteboard = NSPasteboard.withUniqueName()
+    defer { pasteboard.releaseGlobally() }
+    // Neither the history row nor the original payload needs to stay alive.
+    let item = ImageDragPayload(data: data, directory: directory).pasteboardItem()
+    XCTAssertTrue(pasteboard.writeObjects([item]))
+    let path = try XCTUnwrap(pasteboard.string(forType: .fileURL))
+    let url = try XCTUnwrap(URL(string: path))
+    XCTAssertTrue(url.isFileURL)
+    XCTAssertEqual(try Data(contentsOf: url), data)
+    XCTAssertEqual(pasteboard.data(forType: .png), data)
+    XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: directory.path).count, 1)
+  }
+
+  func testNativePasteboardReusesTheSameCacheAsItemProvider() async throws {
+    let data = try imageData(.png)
+    let provider = ImageDragPayload(data: data, directory: directory).itemProvider()
+    let urlData = try await provider.dragData(for: .fileURL)
+    let expectedURL = try XCTUnwrap(URL(dataRepresentation: urlData, relativeTo: nil))
+    let pasteboard = NSPasteboard.withUniqueName()
+    defer { pasteboard.releaseGlobally() }
+    let item = ImageDragPayload(data: data, directory: directory).pasteboardItem()
+    XCTAssertTrue(pasteboard.writeObjects([item]))
+    XCTAssertEqual(pasteboard.string(forType: .fileURL), expectedURL.absoluteString)
+    XCTAssertEqual(try FileManager.default.contentsOfDirectory(atPath: directory.path).count, 1)
+  }
+
   private func imageData(_ type: NSBitmapImageRep.FileType) throws -> Data {
     let bitmap = try XCTUnwrap(NSBitmapImageRep(
       bitmapDataPlanes: nil, pixelsWide: 640, pixelsHigh: 480,

@@ -58,8 +58,9 @@ struct HistoryItemView: View {
       Text(verbatim: item.title)
     }
     .accessibilityIdentifier("copy-history-item")
-    .buttonAction(performSelect)
-    .modifier(ImageDragModifier(item: item))
+    .accessibilityAddTraits(.isButton)
+    .accessibilityAction(.default, performSelect)
+    .modifier(ImageDragModifier(item: item, onClick: performSelect))
     .onAppear {
       item.ensureThumbnailImage()
     }
